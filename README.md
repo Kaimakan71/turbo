@@ -26,13 +26,20 @@ Turbo comes with some extra files used internally, but suitable for use external
 const turbo = require("./<path to turbo folder>/http");
 
 /**
+ * All options are optional!
  * @property {Number} timeout : The inactivity timeout in seconds, after which the server will close the socket's connection
  * @property {Number} maxRequests : The maximum amount of requests a socket may make in its lifetime
  * @property {JSON} plugins : List a plugin id here to activate it. The value should be an object, with all plugin parameters optional.
+ * @property {Function} onrequest : A custom request listener to be called after plugins have been run
+ * @see http.js for documentation on request and response
  */
 const server = new turbo.HTTPServer({
   plugins: {
     static: {}
+  },
+  onrequest: (request, response) => {
+    // Docs in http.js :)
+    return response;
   }
 }).listen(80);
 ```
