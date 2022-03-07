@@ -2,6 +2,10 @@ const net = require("net");
 const plugins = require("./plugins");
 const statusCodes = require("./status_codes");
 
+function emptyRequestListener(request, response) {
+	return response;
+}
+
 class Server extends net.Server {
 	constructor(options = {}) {
 		super();
@@ -9,6 +13,7 @@ class Server extends net.Server {
 		this.timeout = options.timeout || 5;
 		this.maxRequests = options.maxRequests || 32;
 		this.pluginConfig = options.plugins || { "static": {} };
+		this.customRequestListener = options.onrequest || emptyRequestListener;
 
 		// Get ready to recieve connections
 		this.on("connection", this.#onConnection);
@@ -104,6 +109,8 @@ class Server extends net.Server {
 				response = plugins[name](this.pluginConfig[name], request, response) || response;
 			}
 		});
+
+		response = this.customRequestListener(request, response) || response;
 
 		// If response is not 200 OK, send response as an error
 		if(response.status !== 200) {
