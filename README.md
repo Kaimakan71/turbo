@@ -10,7 +10,6 @@ If you would like to contribute code, make a pull request
 * Method for adding types to mime_types.js
 * HTTPS functionality?
 * Custom error pages?
-* Logging?
 
 ## Plugins
 * Static server (static), params: { root = __dirname }
@@ -30,7 +29,8 @@ const turbo = require("./<path to turbo folder>/http");
  * @property {Number} timeout : The inactivity timeout in seconds, after which the server will close the socket's connection
  * @property {Number} maxRequests : The maximum amount of requests a socket may make in its lifetime
  * @property {JSON} plugins : List a plugin id here to activate it. The value should be an object, with all plugin parameters optional.
- * @property {Function} onrequest : A custom request listener to be called after plugins have been run
+ * @property {Function} preProcessor : Custom request listener called before plugins
+ * @property {Function} postProcessor : Custom request listener called after plugins
  * @see http.js for documentation on request and response
  */
 const server = new turbo.HTTPServer({
