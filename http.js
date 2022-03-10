@@ -2,7 +2,7 @@ const net = require("net");
 const plugins = require("./plugins");
 const statusCodes = require("./status_codes");
 
-function emptyRequestListener(request, response) {
+function emptyProcessor(request, response) {
 	return response;
 }
 
@@ -12,8 +12,9 @@ class Server extends net.Server {
 
 		this.timeout = options.timeout || 5;
 		this.maxRequests = options.maxRequests || 32;
-		this.pluginConfig = options.plugins || { "static": {} };
-		this.customRequestListener = options.onrequest || emptyRequestListener;
+		this.pluginConfig = options.plugins || { static: {} };
+		this.preProcessor = options.preProcessor || emptyProcessor;
+		this.postProcessor = options.postProcessor || emptyProcessor;
 
 		// Get ready to recieve connections
 		this.on("connection", this.#onConnection);
@@ -35,12 +36,15 @@ class Server extends net.Server {
 		if(retry) headers["Retry-After"] = retry;
 
 		// Error message eg. "404 Not Found: /index.html"
-		const message = `${code} ${statusCodes[code] || "Unknown"}: ${trace || socket.remoteAddress}`;
+		const baseMessage = `${code} ${statusCodes[code] || "Unknown"}: `;
+		const traceMessage = trace || socket.remoteAddress;
 		
 		// Send response
-		this.#sendResponse(socket, code, headers, message);
+		this.#sendResponse(socket, code, headers, baseMessage + traceMessage);
 		// Destroy the socket and prevent further transmission on this socket
 		socket.destroy();
+		// Log error! (with full path)
+		console.log(baseMessage + __dirname + traceMessage);
 	}
 	#onData(socket, rawRequest) {
 		// data[0] is headers and data[1] is any request data, usually empty
@@ -66,6 +70,7 @@ class Server extends net.Server {
 		request.httpVersion = request.commandArgs[2];
 		request.headers = {};
 		request.data = data[1];
+		request.params = {};
 		
 		// Parse headers into JSON dictionary
 		rawHeaders.forEach((value, index) => {
@@ -75,6 +80,20 @@ class Server extends net.Server {
 				request.headers[value[0]] = value[1];
 			}
 		});
+
+		if(request.url.includes("?") || request.data.length > 0) {
+			var segs;
+			if((request.headers["Content-Type"] || "NSPEC") === "application/x-www-form-urlencoded") {
+				segs = [ "NOURL", request.data ];
+			} else {
+				segs = request.url.split("?");
+				request.url = segs[0];
+			}
+			segs[1].split("&").forEach((value, index) => {
+				const values = value.split("=");
+				request.params[values[0]] = values[1];
+			});
+		}
 
 		// Request syntax error
 		if(
@@ -103,6 +122,8 @@ class Server extends net.Server {
 		// If we shouldn't close the connection, send inactivity timeout and max requests
 		if(response.headers["Connection"] === "keep-alive") response.headers["Keep-Alive"] = `timeout=${this.timeout}, max=${this.maxRequests}`;
 
+		response = this.preProcessor(request, response) || response;
+
 		// Run plugins one by one
 		Object.keys(this.pluginConfig).forEach((name) => {
 			if(plugins[name]) {
@@ -110,7 +131,7 @@ class Server extends net.Server {
 			}
 		});
 
-		response = this.customRequestListener(request, response) || response;
+		response = this.postProcessor(request, response) || response;
 
 		// If response is not 200 OK, send response as an error
 		if(response.status !== 200) {
