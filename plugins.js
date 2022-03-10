@@ -17,11 +17,12 @@ module.exports = {
 
 		// Serve 404 errors
 		if(fs.existsSync(localPath)) {
-			// File found! serve to user
-			const data = fs.readFileSync(localPath);
 			// Set MIME type
 			response.headers["Content-Type"] = mimeTypes[dots[dots.length - 1]] || "application/octet-stream";
-			response.data = data || "No Content";
+			
+			// Don't send file contents for HEAD
+			if(request.method !== "HEAD") response.data = fs.readFileSync(localPath) || "No Content";
+			else response.data = "";
 		} else {
 			// Error!
 			response.status = 404;
